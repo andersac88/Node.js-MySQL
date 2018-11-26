@@ -2,6 +2,8 @@ const inquirer = require("inquirer");
 const mysql = require("mysql");
 const cTable = require("console.table");
 
+let temp = [];
+
 var connection = mysql.createConnection({
   host: "127.0.0.1",
   port: 3306,
@@ -72,6 +74,7 @@ const viewProducts = () => {
       throw error;
     }
     console.table(result);
+    bamazonAll();
   });
 };
 
@@ -132,7 +135,7 @@ const addInventory = () => {
               stock_quantity: newQuantity
             },
             {
-              item_id: selection.item_id
+              id: selection.id
             }
           ],
           function(error) {
@@ -240,7 +243,6 @@ const bamazonCustomer = () => {
         }
       ])
       .then(function(answer) {
-
         let userChoice;
         for (var i = 0; i < result.length; i++) {
           if (result[i].id == answer.idSelector) {
@@ -268,14 +270,13 @@ const bamazonCustomer = () => {
               if (error) {
                 throw error;
               }
-              console.log(
-                `Purchase Successfull, your total is $${amountSpent}`
-              );
+              console.log(`Purchase Successful, your total is $${amountSpent}`);
               bamazonAll();
             }
           );
         } else {
           console.log("Insufficient quantity!");
+          bamazonAll();
         }
       });
   });
@@ -302,7 +303,7 @@ const bamazonSupervisor = () => {
 
 const viewDepartment = () => {
   connection.query(
-    "SELECT d.name, SUM(p.product_sales) AS sales, SUM(p.product_sales) - d.overhead AS profit FROM departments AS d JOIN products AS p ON (d.name = p.department_name) GROUP BY d.id",
+    "SELECT d.id, d.name, d.overhead, SUM(p.product_sales) AS sales, SUM(p.product_sales) - d.overhead AS profit FROM departments AS d JOIN products AS p ON (d.name = p.department_name) GROUP BY d.id",
     function(error, result) {
       if (error) {
         throw error;
@@ -314,41 +315,54 @@ const viewDepartment = () => {
 };
 
 const createDepartment = () => {
-  inquirer
-    .prompt([
-      {
-        name: "department",
-        type: "input",
-        message: "What new department would you like to create?"
-      },
-      {
-        name: "overhead",
-        type: "input",
-        message: "What is the overhead of this new department?",
-        validate: function(value) {
-          if (isNaN(value) === false) {
+  connection.query("SELECT * FROM departments", function(error, result) {
+    if (error) {
+      throw error;
+    }
+    inquirer
+      .prompt([
+        {
+          name: "department",
+          type: "input",
+          message: "What new department would you like to create?",
+          validate: function(value) {
+            for (let i = 0; i < result.length; i++) {
+              if (result[i].name === value) {
+                return "This department already exists";
+              }
+            }
             return true;
           }
-          return "Invalid Entry; please enter a number";
-        }
-      }
-    ])
-    .then(function(answer) {
-      connection.query(
-        "INSERT INTO departments SET ?",
-        [
-          {
-            name: answer.department,
-            overhead: answer.overhead
+        },
+        {
+          name: "overhead",
+          type: "input",
+          message: "What is the overhead of this new department?",
+          validate: function(value) {
+            if (isNaN(value) === false) {
+              return true;
+            }
+            return "Invalid Entry; please enter a number";
           }
-        ],
-        function(error) {
-          if (error) {
-            throw error;
-          }
-          console.log("New department successfully added");
-          bamazonAll();
         }
-      );
-    });
+      ])
+      .then(function(answer) {
+        connection.query(
+          "INSERT INTO departments SET ?",
+          [
+            {
+              name: answer.department,
+              overhead: answer.overhead
+            }
+          ],
+          function(error) {
+            if (error) {
+              throw error;
+            }
+            console.log("New department successfully added");
+            bamazonAll();
+          }
+        );
+      });
+  });
 };
