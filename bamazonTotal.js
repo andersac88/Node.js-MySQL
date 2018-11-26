@@ -2,8 +2,6 @@ const inquirer = require("inquirer");
 const mysql = require("mysql");
 const cTable = require("console.table");
 
-let temp = [];
-
 var connection = mysql.createConnection({
   host: "127.0.0.1",
   port: 3306,
@@ -40,6 +38,73 @@ const bamazonAll = () => {
     });
 };
 
+const bamazonCustomer = () => {
+  connection.query("SELECT * FROM products", function(error, result) {
+    if (error) {
+      throw error;
+    }
+    console.table(result);
+    inquirer
+      .prompt([
+        {
+          type: "rawlist",
+          message:
+            "Please select the ID of the item you would like to purchase.",
+          choices: result.map(item => item.id.toString()),
+          name: "idSelector"
+        },
+        {
+          name: "howMany",
+          message: "How many units would you like to purchase of said product?",
+          type: "input",
+          validate: function(value) {
+            if (isNaN(value) === false) {
+              return true;
+            }
+            return "Invalid Entry; please enter a number";
+          }
+        }
+      ])
+      .then(function(answer) {
+        let userChoice;
+        for (var i = 0; i < result.length; i++) {
+          if (result[i].id == answer.idSelector) {
+            userChoice = result[i];
+          }
+        }
+
+        if (userChoice.stock_quantity > parseInt(answer.howMany)) {
+          let newQuantity = userChoice.stock_quantity - answer.howMany;
+          let amountSpent = answer.howMany * userChoice.price;
+          let productSale = userChoice.product_sales + amountSpent;
+
+          connection.query(
+            "UPDATE products SET ? WHERE ?",
+            [
+              {
+                stock_quantity: newQuantity,
+                product_sales: productSale
+              },
+              {
+                id: userChoice.id
+              }
+            ],
+            function(error) {
+              if (error) {
+                throw error;
+              }
+              console.log(`Purchase Successful, your total is $${amountSpent}`);
+              bamazonAll();
+            }
+          );
+        } else {
+          console.log("Insufficient quantity!");
+          bamazonAll();
+        }
+      });
+  });
+};
+
 const bamazonManager = () => {
   inquirer
     .prompt([
@@ -64,6 +129,25 @@ const bamazonManager = () => {
         addInventory();
       } else if (answer.managerSelection === "Add New Product") {
         newProduct();
+      }
+    });
+};
+
+const bamazonSupervisor = () => {
+  inquirer
+    .prompt([
+      {
+        name: "supervisorSelection",
+        type: "rawlist",
+        message: "Please select what you would like to do.",
+        choices: ["View Product Sales by Department", "Create New Department"]
+      }
+    ])
+    .then(function(answer) {
+      if (answer.supervisorSelection === "View Product Sales by Department") {
+        viewDepartment();
+      } else if (answer.supervisorSelection === "Create New Department") {
+        createDepartment();
       }
     });
 };
@@ -212,93 +296,6 @@ const newProduct = () => {
         );
       });
   });
-};
-
-const bamazonCustomer = () => {
-  connection.query("SELECT * FROM products", function(error, result) {
-    if (error) {
-      throw error;
-    }
-
-    console.table(result);
-    inquirer
-      .prompt([
-        {
-          type: "rawlist",
-          message:
-            "Please select the ID of the item you would like to purchase.",
-          choices: result.map(item => item.id.toString()),
-          name: "idSelector"
-        },
-        {
-          name: "howMany",
-          message: "How many units would you like to purchase of said product?",
-          type: "input",
-          validate: function(value) {
-            if (isNaN(value) === false) {
-              return true;
-            }
-            return "Invalid Entry; please enter a number";
-          }
-        }
-      ])
-      .then(function(answer) {
-        let userChoice;
-        for (var i = 0; i < result.length; i++) {
-          if (result[i].id == answer.idSelector) {
-            userChoice = result[i];
-          }
-        }
-
-        if (userChoice.stock_quantity > parseInt(answer.howMany)) {
-          let newQuantity = userChoice.stock_quantity - answer.howMany;
-          let amountSpent = answer.howMany * userChoice.price;
-          let productSale = userChoice.product_sales + amountSpent;
-
-          connection.query(
-            "UPDATE products SET ? WHERE ?",
-            [
-              {
-                stock_quantity: newQuantity,
-                product_sales: productSale
-              },
-              {
-                id: userChoice.id
-              }
-            ],
-            function(error) {
-              if (error) {
-                throw error;
-              }
-              console.log(`Purchase Successful, your total is $${amountSpent}`);
-              bamazonAll();
-            }
-          );
-        } else {
-          console.log("Insufficient quantity!");
-          bamazonAll();
-        }
-      });
-  });
-};
-
-const bamazonSupervisor = () => {
-  inquirer
-    .prompt([
-      {
-        name: "supervisorSelection",
-        type: "rawlist",
-        message: "Please select what you would like to do.",
-        choices: ["View Product Sales by Department", "Create New Department"]
-      }
-    ])
-    .then(function(answer) {
-      if (answer.supervisorSelection === "View Product Sales by Department") {
-        viewDepartment();
-      } else if (answer.supervisorSelection === "Create New Department") {
-        createDepartment();
-      }
-    });
 };
 
 const viewDepartment = () => {

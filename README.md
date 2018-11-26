@@ -1,6 +1,6 @@
 # Node.js-MySQL
 
-This is node based application that uses the terminal to manipulate data from MySQL. Under the guise of a storefront, users will be presented with various prompts and based on their responses, the MySQL database will be accessed and either the products or departments tables will be displayed in the terminal and/or manipulated.
+This is node based application that uses the terminal to manipulate data from a MySQL database. Under the guise of a storefront, users will be presented with various prompts and based on their responses, the MySQL database will be accessed and either the products or departments tables will be displayed in the terminal and/or manipulated.
 
 To initiate the application, the user will open the terminal from the file in which the application is stored. In the terminal, the user will then type node bamazonTotal.js; screenshot below.
 
