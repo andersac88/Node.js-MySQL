@@ -14,6 +14,31 @@ connection.connect(function(error) {
   if (error) {
     throw error;
   }
+  bamazonAll();
+});
+
+const bamazonAll = () => {
+  inquirer
+    .prompt([
+      {
+        name: "role",
+        type: "rawlist",
+        message: "Are you a Customer, Manager or Supervisor?",
+        choices: ["Customer", "Manager", "Supervisor"]
+      }
+    ])
+    .then(function(answer) {
+      if (answer.role === "Customer") {
+        bamazonCustomer();
+      } else if (answer.role === "Manager") {
+        bamazonManager();
+      } else if (answer.role === "Supervisor") {
+        bamazonSupervisor();
+      }
+    });
+};
+
+const bamazonManager = () => {
   inquirer
     .prompt([
       {
@@ -39,24 +64,16 @@ connection.connect(function(error) {
         newProduct();
       }
     });
-});
+};
 
-//   * List a set of menu options:
-
-//     * View Products for Sale
-//   * If a manager selects `View Products for Sale`, the app should list every available item: the item IDs, names, prices, and quantities.
 const viewProducts = () => {
   connection.query("SELECT * FROM products", function(error, result) {
     if (error) {
       throw error;
     }
-
     console.table(result);
   });
 };
-
-//     * View Low Inventory
-//   * If a manager selects `View Low Inventory`, then it should list all items with an inventory count lower than five.
 
 const lowInventory = () => {
   connection.query("SELECT * FROM products WHERE stock_quantity < 6", function(
@@ -68,12 +85,11 @@ const lowInventory = () => {
     }
     if (result[0] == undefined) {
       console.log("All products have more than 5 items in stock");
+      bamazonAll();
     } else console.table(result);
+    bamazonAll();
   });
 };
-
-//     * Add to Inventory
-//   * If a manager selects `Add to Inventory`, your app should display a prompt that will let the manager "add more" of any item currently in the store.
 
 const addInventory = () => {
   connection.query("SELECT * FROM products", function(error, results) {
@@ -86,9 +102,7 @@ const addInventory = () => {
           name: "itemSelect",
           type: "rawlist",
           message: "What item would you like to increase the inventory of?",
-          choices: results.map(function(item) {
-            return item.product_name;
-          })
+          choices: results.map(item => item.product_name)
         },
         {
           name: "itemQuantity",
@@ -126,14 +140,12 @@ const addInventory = () => {
               throw error;
             }
             console.log("Inventory Updated");
+            bamazonAll();
           }
         );
       });
   });
 };
-
-//     * Add New Product
-//   * If a manager selects `Add New Product`, it should allow the manager to add a completely new product to the store.
 
 const newProduct = () => {
   connection.query("SELECT * FROM departments", function(error, result) {
@@ -151,9 +163,7 @@ const newProduct = () => {
           name: "department",
           type: "rawlist",
           message: "What department will this product be in?",
-          choices: result.map(function(item) {
-            return item.name;
-          })
+          choices: result.map(item => item.name)
         },
         {
           name: "price",
@@ -194,8 +204,151 @@ const newProduct = () => {
               throw error;
             }
             console.log("New items successfully added");
+            bamazonAll();
           }
         );
       });
   });
+};
+
+const bamazonCustomer = () => {
+  connection.query("SELECT * FROM products", function(error, result) {
+    if (error) {
+      throw error;
+    }
+
+    console.table(result);
+    inquirer
+      .prompt([
+        {
+          type: "rawlist",
+          message:
+            "Please select the ID of the item you would like to purchase.",
+          choices: result.map(item => item.id.toString()),
+          name: "idSelector"
+        },
+        {
+          name: "howMany",
+          message: "How many units would you like to purchase of said product?",
+          type: "input",
+          validate: function(value) {
+            if (isNaN(value) === false) {
+              return true;
+            }
+            return "Invalid Entry; please enter a number";
+          }
+        }
+      ])
+      .then(function(answer) {
+
+        let userChoice;
+        for (var i = 0; i < result.length; i++) {
+          if (result[i].id == answer.idSelector) {
+            userChoice = result[i];
+          }
+        }
+
+        if (userChoice.stock_quantity > parseInt(answer.howMany)) {
+          let newQuantity = userChoice.stock_quantity - answer.howMany;
+          let amountSpent = answer.howMany * userChoice.price;
+          let productSale = userChoice.product_sales + amountSpent;
+
+          connection.query(
+            "UPDATE products SET ? WHERE ?",
+            [
+              {
+                stock_quantity: newQuantity,
+                product_sales: productSale
+              },
+              {
+                id: userChoice.id
+              }
+            ],
+            function(error) {
+              if (error) {
+                throw error;
+              }
+              console.log(
+                `Purchase Successfull, your total is $${amountSpent}`
+              );
+              bamazonAll();
+            }
+          );
+        } else {
+          console.log("Insufficient quantity!");
+        }
+      });
+  });
+};
+
+const bamazonSupervisor = () => {
+  inquirer
+    .prompt([
+      {
+        name: "supervisorSelection",
+        type: "rawlist",
+        message: "Please select what you would like to do.",
+        choices: ["View Product Sales by Department", "Create New Department"]
+      }
+    ])
+    .then(function(answer) {
+      if (answer.supervisorSelection === "View Product Sales by Department") {
+        viewDepartment();
+      } else if (answer.supervisorSelection === "Create New Department") {
+        createDepartment();
+      }
+    });
+};
+
+const viewDepartment = () => {
+  connection.query(
+    "SELECT d.name, SUM(p.product_sales) AS sales, SUM(p.product_sales) - d.overhead AS profit FROM departments AS d JOIN products AS p ON (d.name = p.department_name) GROUP BY d.id",
+    function(error, result) {
+      if (error) {
+        throw error;
+      }
+      console.table(result);
+      bamazonAll();
+    }
+  );
+};
+
+const createDepartment = () => {
+  inquirer
+    .prompt([
+      {
+        name: "department",
+        type: "input",
+        message: "What new department would you like to create?"
+      },
+      {
+        name: "overhead",
+        type: "input",
+        message: "What is the overhead of this new department?",
+        validate: function(value) {
+          if (isNaN(value) === false) {
+            return true;
+          }
+          return "Invalid Entry; please enter a number";
+        }
+      }
+    ])
+    .then(function(answer) {
+      connection.query(
+        "INSERT INTO departments SET ?",
+        [
+          {
+            name: answer.department,
+            overhead: answer.overhead
+          }
+        ],
+        function(error) {
+          if (error) {
+            throw error;
+          }
+          console.log("New department successfully added");
+          bamazonAll();
+        }
+      );
+    });
 };

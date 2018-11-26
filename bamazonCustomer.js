@@ -10,6 +10,7 @@ var connection = mysql.createConnection({
   database: "bamazon_db"
 });
 
+
 connection.connect(function(error) {
   if (error) throw error;
 
@@ -17,6 +18,7 @@ connection.connect(function(error) {
     if (error) {
       throw error;
     }
+
     console.table(result);
     //     The app should then prompt users with two messages.
     inquirer
@@ -27,7 +29,7 @@ connection.connect(function(error) {
           message:
             "Please select the ID of the item you would like to purchase.",
           choices: result.map(function(item) {
-            return item.item_id.toString();
+            return item.id.toString();
           }),
           name: "idSelector"
         },
@@ -49,7 +51,7 @@ connection.connect(function(error) {
 
         let userChoice;
         for (var i = 0; i < result.length; i++) {
-          if (result[i].item_id == answer.idSelector) {
+          if (result[i].id == answer.idSelector) {
             userChoice = result[i];
           }
         }
@@ -59,16 +61,18 @@ connection.connect(function(error) {
         if (userChoice.stock_quantity > parseInt(answer.howMany)) {
           let newQuantity = userChoice.stock_quantity - answer.howMany;
           let amountSpent = answer.howMany * userChoice.price;
+          let productSale = userChoice.product_sales + amountSpent;
 
           connection.query(
             //     * This means updating the SQL database to reflect the remaining quantity.
             "UPDATE products SET ? WHERE ?",
             [
               {
-                stock_quantity: newQuantity
+                stock_quantity: newQuantity,
+                product_sales: productSale
               },
               {
-                item_id: userChoice.item_id
+                id: userChoice.id
               }
             ],
             function(error) {
